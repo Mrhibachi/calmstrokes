@@ -10,12 +10,6 @@ from config import *
 GDRIVE_FOLDER_ID = "1_1AZn3XjrrqrM_dNfS5yKmb0DqHHWxu9"
 DOWNLOAD_FOLDER = "images"
 
-def get_drive_images():
-    """Get list of images from Google Drive folder."""
-    url = f"https://drive.google.com/drive/folders/{GDRIVE_FOLDER_ID}"
-    files = gdown.download_folder(url, output=DOWNLOAD_FOLDER, quiet=True, use_cookies=False)
-    return files
-
 def load_json(filepath):
     if os.path.exists(filepath):
         with open(filepath, "r") as f:
@@ -25,6 +19,67 @@ def load_json(filepath):
 def save_json(filepath, data):
     with open(filepath, "w") as f:
         json.dump(data, f, indent=2)
+
+def get_drive_file_list():
+    """Get list of files in Google Drive folder using Drive API."""
+    posted = load_json(POSTED_FILE)
+    posted_files = [p["file"] for p in posted]
+
+    # Use gdown to list files in the folder
+    url = f"https://drive.google.com/drive/folders/{GDRIVE_FOLDER_ID}"
+    try:
+        # Get folder contents without downloading
+        files = gdown.download_folder(
+            url,
+            output=DOWNLOAD_FOLDER,
+            quiet=True,
+            use_cookies=False,
+            remaining_ok=True  # Don't fail if >50 files
+        )
+        return files
+    except Exception as e:
+        print(f"Error listing folder: {e}")
+        return []
+
+def download_one_image():
+    """Download just one unposted image from Drive."""
+    posted = load_json(POSTED_FILE)
+    posted_files = [p["file"] for p in posted]
+
+    os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
+
+    # Check if we already have unposted images locally
+    supported = (".jpg", ".jpeg", ".png", ".gif", ".webp")
+    local_images = [f for f in sorted(os.listdir(DOWNLOAD_FOLDER))
+                    if f.lower().endswith(supported) and f not in posted_files]
+
+    if local_images:
+        # Already have images locally, use them
+        return os.path.join(DOWNLOAD_FOLDER, local_images[0])
+
+    # Need to download more - get them in small batches
+    try:
+        url = f"https://drive.google.com/drive/folders/{GDRIVE_FOLDER_ID}"
+        print("📥 Downloading images from Google Drive...")
+        gdown.download_folder(
+            url,
+            output=DOWNLOAD_FOLDER,
+            quiet=True,
+            use_cookies=False,
+            remaining_ok=True
+        )
+    except Exception as e:
+        print(f"Error downloading from Drive: {e}")
+        return None
+
+    # Check again after download
+    local_images = [f for f in sorted(os.listdir(DOWNLOAD_FOLDER))
+                    if f.lower().endswith(supported) and f not in posted_files]
+
+    if local_images:
+        return os.path.join(DOWNLOAD_FOLDER, local_images[0])
+
+    return None
 
 def post_image_to_facebook(image_path, caption=None):
     if caption is None:
@@ -40,9 +95,17 @@ def post_image_to_facebook(image_path, caption=None):
     if "id" in result:
         print(f"✅ Posted: {os.path.basename(image_path)} at {datetime.now().strftime('%H:%M:%S')}")
         posted = load_json(POSTED_FILE)
-        posted.append({"file": os.path.basename(image_path), "post_id": result["id"], "posted_at": datetime.now().isoformat()})
+        posted.append({
+            "file": os.path.basename(image_path),
+            "post_id": result["id"],
+            "posted_at": datetime.now().isoformat()
+        })
         save_json(POSTED_FILE, posted)
-        os.remove(image_path)
+        # Remove image after posting to save space
+        try:
+            os.remove(image_path)
+        except:
+            pass
         return True
     else:
         print(f"❌ Failed: {result}")
@@ -51,26 +114,10 @@ def post_image_to_facebook(image_path, caption=None):
 def run_post():
     """Download next image from Drive and post it."""
     print(f"🎮 Checking for images to post at {datetime.now().strftime('%H:%M')}")
-    posted = load_json(POSTED_FILE)
-    posted_files = [p["file"] for p in posted]
-    
-    os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
-    
-    # Download folder
-    try:
-        url = f"https://drive.google.com/drive/folders/{GDRIVE_FOLDER_ID}"
-        gdown.download_folder(url, output=DOWNLOAD_FOLDER, quiet=True, use_cookies=False)
-    except Exception as e:
-        print(f"Error downloading: {e}")
-        return
 
-    # Find unposted image
-    supported = (".jpg", ".jpeg", ".png", ".gif", ".webp")
-    images = [f for f in sorted(os.listdir(DOWNLOAD_FOLDER)) 
-              if f.lower().endswith(supported) and f not in posted_files]
-    
-    if images:
-        image_path = os.path.join(DOWNLOAD_FOLDER, images[0])
+    image_path = download_one_image()
+
+    if image_path and os.path.exists(image_path):
         post_image_to_facebook(image_path)
     else:
         print("📭 No new images to post")
@@ -78,11 +125,11 @@ def run_post():
 def start():
     print("🎮 CalmStrokes Cloud Scheduler Started!")
     print(f"📅 Posting {POSTS_PER_DAY} times per day")
-    
+
     times = POST_TIMES[:POSTS_PER_DAY]
     for t in times:
         schedule.every().day.at(t).do(run_post)
-    
+
     while True:
         schedule.run_pending()
         time.sleep(30)
