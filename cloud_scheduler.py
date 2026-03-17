@@ -5,10 +5,56 @@ import schedule
 import requests
 import gdown
 from datetime import datetime
+from googleapiclient.discovery import build
+from google.oauth2 import service_account
 from config import *
 
 GDRIVE_FOLDER_ID = "1_1AZn3XjrrqrM_dNfS5yKmb0DqHHWxu9"
 DOWNLOAD_FOLDER = "images"
+SCOPES = ["https://www.googleapis.com/auth/drive"]
+
+def get_drive_service():
+    """Get authenticated Google Drive service from env var or file."""
+    sa_json = os.environ.get("GOOGLE_SERVICE_ACCOUNT_JSON")
+    if sa_json:
+        # Running on Railway - use environment variable
+        sa_info = json.loads(sa_json)
+        creds = service_account.Credentials.from_service_account_info(
+            sa_info, scopes=SCOPES
+        )
+    else:
+        # Running locally - use file
+        creds = service_account.Credentials.from_service_account_file(
+            "service_account.json", scopes=SCOPES
+        )
+    return build("drive", "v3", credentials=creds)
+
+def get_drive_files():
+    """Get list of image files in Drive folder."""
+    service = get_drive_service()
+    results = service.files().list(
+        q=f"'{GDRIVE_FOLDER_ID}' in parents and trashed=false",
+        fields="files(id, name)",
+        orderBy="name"
+    ).execute()
+    return results.get("files", [])
+def delete_from_drive(file_id):
+    try:
+        service = get_drive_service()
+        service.files().update(fileId=file_id, body={"trashed": True}).execute()
+        print(f"🗑️ Deleted from Drive: {file_id}")
+        return True
+    except Exception as e:
+        print(f"❌ Failed to delete from Drive: {e}")
+        return False
+
+def download_file_from_drive(file_id, filename):
+    """Download a single file from Drive."""
+    os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
+    output_path = os.path.join(DOWNLOAD_FOLDER, filename)
+    url = f"https://drive.google.com/uc?id={file_id}"
+    gdown.download(url, output_path, quiet=True)
+    return output_path
 
 def load_json(filepath):
     if os.path.exists(filepath):
@@ -19,67 +65,6 @@ def load_json(filepath):
 def save_json(filepath, data):
     with open(filepath, "w") as f:
         json.dump(data, f, indent=2)
-
-def get_drive_file_list():
-    """Get list of files in Google Drive folder using Drive API."""
-    posted = load_json(POSTED_FILE)
-    posted_files = [p["file"] for p in posted]
-
-    # Use gdown to list files in the folder
-    url = f"https://drive.google.com/drive/folders/{GDRIVE_FOLDER_ID}"
-    try:
-        # Get folder contents without downloading
-        files = gdown.download_folder(
-            url,
-            output=DOWNLOAD_FOLDER,
-            quiet=True,
-            use_cookies=False,
-            remaining_ok=True  # Don't fail if >50 files
-        )
-        return files
-    except Exception as e:
-        print(f"Error listing folder: {e}")
-        return []
-
-def download_one_image():
-    """Download just one unposted image from Drive."""
-    posted = load_json(POSTED_FILE)
-    posted_files = [p["file"] for p in posted]
-
-    os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
-
-    # Check if we already have unposted images locally
-    supported = (".jpg", ".jpeg", ".png", ".gif", ".webp")
-    local_images = [f for f in sorted(os.listdir(DOWNLOAD_FOLDER))
-                    if f.lower().endswith(supported) and f not in posted_files]
-
-    if local_images:
-        # Already have images locally, use them
-        return os.path.join(DOWNLOAD_FOLDER, local_images[0])
-
-    # Need to download more - get them in small batches
-    try:
-        url = f"https://drive.google.com/drive/folders/{GDRIVE_FOLDER_ID}"
-        print("📥 Downloading images from Google Drive...")
-        gdown.download_folder(
-            url,
-            output=DOWNLOAD_FOLDER,
-            quiet=True,
-            use_cookies=False,
-            remaining_ok=True
-        )
-    except Exception as e:
-        print(f"Error downloading from Drive: {e}")
-        return None
-
-    # Check again after download
-    local_images = [f for f in sorted(os.listdir(DOWNLOAD_FOLDER))
-                    if f.lower().endswith(supported) and f not in posted_files]
-
-    if local_images:
-        return os.path.join(DOWNLOAD_FOLDER, local_images[0])
-
-    return None
 
 def post_image_to_facebook(image_path, caption=None):
     if caption is None:
@@ -101,7 +86,6 @@ def post_image_to_facebook(image_path, caption=None):
             "posted_at": datetime.now().isoformat()
         })
         save_json(POSTED_FILE, posted)
-        # Remove image after posting to save space
         try:
             os.remove(image_path)
         except:
@@ -112,15 +96,43 @@ def post_image_to_facebook(image_path, caption=None):
         return False
 
 def run_post():
-    """Download next image from Drive and post it."""
+    """Get next image from Drive, post it, then delete it from Drive."""
     print(f"🎮 Checking for images to post at {datetime.now().strftime('%H:%M')}")
 
-    image_path = download_one_image()
+    try:
+        files = get_drive_files()
 
-    if image_path and os.path.exists(image_path):
-        post_image_to_facebook(image_path)
-    else:
-        print("📭 No new images to post")
+        if not files:
+            print("📭 No images left in Drive folder")
+            return
+
+        posted = load_json(POSTED_FILE)
+        posted_files = [p["file"] for p in posted]
+
+        next_file = None
+        for f in files:
+            if f["name"] not in posted_files:
+                next_file = f
+                break
+
+        if not next_file:
+            print("📭 All images have been posted")
+            return
+
+        print(f"📥 Downloading {next_file['name']}...")
+        image_path = download_file_from_drive(next_file["id"], next_file["name"])
+
+        if not os.path.exists(image_path):
+            print("❌ Download failed")
+            return
+
+        success = post_image_to_facebook(image_path)
+
+        if success:
+            delete_from_drive(next_file["id"])
+
+    except Exception as e:
+        print(f"❌ Error in run_post: {e}")
 
 def start():
     print("🎮 CalmStrokes Cloud Scheduler Started!")
