@@ -17,13 +17,11 @@ def get_drive_service():
     """Get authenticated Google Drive service from env var or file."""
     sa_json = os.environ.get("GOOGLE_SERVICE_ACCOUNT_JSON")
     if sa_json:
-        # Running on Railway - use environment variable
         sa_info = json.loads(sa_json)
         creds = service_account.Credentials.from_service_account_info(
             sa_info, scopes=SCOPES
         )
     else:
-        # Running locally - use file
         creds = service_account.Credentials.from_service_account_file(
             "service_account.json", scopes=SCOPES
         )
@@ -38,15 +36,6 @@ def get_drive_files():
         orderBy="name"
     ).execute()
     return results.get("files", [])
-def delete_from_drive(file_id):
-    try:
-        service = get_drive_service()
-        service.files().update(fileId=file_id, body={"trashed": True}).execute()
-        print(f"🗑️ Deleted from Drive: {file_id}")
-        return True
-    except Exception as e:
-        print(f"❌ Failed to delete from Drive: {e}")
-        return False
 
 def download_file_from_drive(file_id, filename):
     """Download a single file from Drive."""
@@ -56,15 +45,27 @@ def download_file_from_drive(file_id, filename):
     gdown.download(url, output_path, quiet=True)
     return output_path
 
-def load_json(filepath):
-    if os.path.exists(filepath):
-        with open(filepath, "r") as f:
+def load_posted():
+    """Load posted history from env var (Railway) or local file."""
+    # Try environment variable first (Railway)
+    env_history = os.environ.get("POSTED_HISTORY")
+    if env_history:
+        try:
+            return json.loads(env_history)
+        except:
+            pass
+    # Fall back to local file
+    if os.path.exists(POSTED_FILE):
+        with open(POSTED_FILE, "r") as f:
             return json.load(f)
     return []
 
-def save_json(filepath, data):
-    with open(filepath, "w") as f:
-        json.dump(data, f, indent=2)
+def save_posted(posted):
+    """Save posted history to local file."""
+    with open(POSTED_FILE, "w") as f:
+        json.dump(posted, f, indent=2)
+    # Print updated history so Railway logs show it
+    print(f"📝 Posted history updated: {len(posted)} total posts")
 
 def post_image_to_facebook(image_path, caption=None):
     if caption is None:
@@ -79,13 +80,13 @@ def post_image_to_facebook(image_path, caption=None):
     result = response.json()
     if "id" in result:
         print(f"✅ Posted: {os.path.basename(image_path)} at {datetime.now().strftime('%H:%M:%S')}")
-        posted = load_json(POSTED_FILE)
+        posted = load_posted()
         posted.append({
             "file": os.path.basename(image_path),
             "post_id": result["id"],
             "posted_at": datetime.now().isoformat()
         })
-        save_json(POSTED_FILE, posted)
+        save_posted(posted)
         try:
             os.remove(image_path)
         except:
@@ -96,7 +97,7 @@ def post_image_to_facebook(image_path, caption=None):
         return False
 
 def run_post():
-    """Get next image from Drive, post it, then delete it from Drive."""
+    """Get next image from Drive, post it."""
     print(f"🎮 Checking for images to post at {datetime.now().strftime('%H:%M')}")
 
     try:
@@ -106,7 +107,7 @@ def run_post():
             print("📭 No images left in Drive folder")
             return
 
-        posted = load_json(POSTED_FILE)
+        posted = load_posted()
         posted_files = [p["file"] for p in posted]
 
         next_file = None
@@ -126,10 +127,7 @@ def run_post():
             print("❌ Download failed")
             return
 
-        success = post_image_to_facebook(image_path)
-
-        if success:
-            delete_from_drive(next_file["id"])
+        post_image_to_facebook(image_path)
 
     except Exception as e:
         print(f"❌ Error in run_post: {e}")
