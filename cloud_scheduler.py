@@ -47,17 +47,26 @@ def download_file_from_drive(file_id, filename):
 
 def load_posted():
     """Load posted history from env var (Railway) or local file."""
-    # Try environment variable first (Railway)
-    env_history = os.environ.get("POSTED_HISTORY")
-    if env_history:
-        try:
-            return json.loads(env_history)
-        except:
-            pass
+    raw_history = os.environ.get("POSTED_HISTORY", "[]")
+    try:
+        env_history = json.loads(raw_history)
+        if isinstance(env_history, list):
+            return env_history
+        print("⚠️ POSTED_HISTORY is not a list, ignoring it")
+    except json.JSONDecodeError:
+        print("⚠️ Invalid POSTED_HISTORY, ignoring it")
+
     # Fall back to local file
     if os.path.exists(POSTED_FILE):
-        with open(POSTED_FILE, "r") as f:
-            return json.load(f)
+        try:
+            with open(POSTED_FILE, "r") as f:
+                file_history = json.load(f)
+            if isinstance(file_history, list):
+                return file_history
+            print("⚠️ Local posted history is not a list, resetting")
+        except (json.JSONDecodeError, OSError):
+            print("⚠️ Local posted history is invalid, resetting")
+
     return []
 
 def save_posted(posted):
