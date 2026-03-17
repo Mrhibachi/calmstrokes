@@ -1,533 +1,191 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>CalmStrokes — Post Scheduler</title>
-  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;400;600&display=swap" rel="stylesheet" />
-  <style>
-    :root {
-      --bg:        #0a0c10;
-      --surface:   #111318;
-      --card:      #161a22;
-      --border:    #1e2330;
-      --accent:    #00f5a0;
-      --accent2:   #00d4ff;
-      --warn:      #ff6b35;
-      --text:      #e8eaf0;
-      --muted:     #4a5068;
-      --glow:      0 0 20px rgba(0,245,160,0.25);
-      --glow2:     0 0 20px rgba(0,212,255,0.25);
-    }
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body {
-      background: var(--bg);
-      color: var(--text);
-      font-family: 'Rajdhani', sans-serif;
-      min-height: 100vh;
-      overflow-x: hidden;
-    }
-    body::before {
-      content: '';
-      position: fixed;
-      inset: 0;
-      background-image:
-        linear-gradient(rgba(0,245,160,0.03) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(0,245,160,0.03) 1px, transparent 1px);
-      background-size: 40px 40px;
-      pointer-events: none;
-      z-index: 0;
-    }
-    .page {
-      position: relative;
-      z-index: 1;
-      max-width: 1100px;
-      margin: 0 auto;
-      padding: 32px 24px;
-    }
-    header {
-      display: flex;
-      align-items: center;
-      gap: 20px;
-      margin-bottom: 40px;
-      padding-bottom: 28px;
-      border-bottom: 1px solid var(--border);
-    }
-    .logo-icon {
-      width: 52px;
-      height: 52px;
-      background: linear-gradient(135deg, var(--accent), var(--accent2));
-      border-radius: 14px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 24px;
-      box-shadow: var(--glow);
-      flex-shrink: 0;
-      animation: pulse 3s ease-in-out infinite;
-    }
-    @keyframes pulse {
-      0%, 100% { box-shadow: 0 0 20px rgba(0,245,160,0.25); }
-      50%       { box-shadow: 0 0 40px rgba(0,245,160,0.5), 0 0 80px rgba(0,245,160,0.15); }
-    }
-    .logo-text h1 {
-      font-family: 'Orbitron', monospace;
-      font-size: 22px;
-      font-weight: 900;
-      letter-spacing: 0.08em;
-      background: linear-gradient(90deg, var(--accent), var(--accent2));
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
-    }
-    .logo-text p {
-      font-size: 11px;
-      letter-spacing: 0.25em;
-      color: var(--muted);
-      text-transform: uppercase;
-      margin-top: 2px;
-    }
-    .header-right {
-      margin-left: auto;
-      display: flex;
-      flex-direction: column;
-      align-items: flex-end;
-      gap: 6px;
-    }
-    .status-badge {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      background: rgba(0,245,160,0.08);
-      border: 1px solid rgba(0,245,160,0.2);
-      border-radius: 20px;
-      padding: 6px 14px;
-      font-size: 12px;
-      font-weight: 600;
-      letter-spacing: 0.1em;
-      text-transform: uppercase;
-      color: var(--accent);
-    }
-    .status-badge .dot {
-      width: 7px;
-      height: 7px;
-      border-radius: 50%;
-      background: var(--accent);
-      animation: blink 1.4s ease-in-out infinite;
-    }
-    @keyframes blink {
-      0%, 100% { opacity: 1; }
-      50%       { opacity: 0.2; }
-    }
-    #live-time {
-      font-family: 'Orbitron', monospace;
-      font-size: 11px;
-      color: var(--muted);
-      letter-spacing: 0.1em;
-    }
-    .stats-grid {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 16px;
-      margin-bottom: 28px;
-    }
-    .stat-card {
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-radius: 16px;
-      padding: 22px 20px;
-      position: relative;
-      overflow: hidden;
-      transition: border-color 0.3s, transform 0.2s;
-    }
-    .stat-card:hover {
-      border-color: rgba(0,245,160,0.3);
-      transform: translateY(-2px);
-    }
-    .stat-card::before {
-      content: '';
-      position: absolute;
-      top: 0; left: 0; right: 0;
-      height: 2px;
-      background: linear-gradient(90deg, var(--accent), var(--accent2));
-      opacity: 0;
-      transition: opacity 0.3s;
-    }
-    .stat-card:hover::before { opacity: 1; }
-    .stat-label {
-      font-size: 10px;
-      letter-spacing: 0.2em;
-      text-transform: uppercase;
-      color: var(--muted);
-      margin-bottom: 10px;
-    }
-    .stat-value {
-      font-family: 'Orbitron', monospace;
-      font-size: 32px;
-      font-weight: 700;
-      line-height: 1;
-      background: linear-gradient(135deg, var(--accent), var(--accent2));
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
-    }
-    .stat-sub { font-size: 12px; color: var(--muted); margin-top: 6px; }
-    .stat-icon { position: absolute; top: 18px; right: 18px; font-size: 22px; opacity: 0.15; }
-    .main-cols {
-      display: grid;
-      grid-template-columns: 1fr 340px;
-      gap: 20px;
-      margin-bottom: 20px;
-    }
-    .section-card {
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-radius: 16px;
-      overflow: hidden;
-    }
-    .section-header {
-      padding: 18px 22px;
-      border-bottom: 1px solid var(--border);
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-    .section-header h2 {
-      font-family: 'Orbitron', monospace;
-      font-size: 12px;
-      letter-spacing: 0.15em;
-      text-transform: uppercase;
-      color: var(--text);
-    }
-    .section-header .tag {
-      margin-left: auto;
-      font-size: 10px;
-      padding: 3px 10px;
-      border-radius: 20px;
-      background: rgba(0,245,160,0.1);
-      color: var(--accent);
-      border: 1px solid rgba(0,245,160,0.2);
-      letter-spacing: 0.1em;
-    }
-    .log-body { padding: 16px; max-height: 320px; overflow-y: auto; }
-    .log-body::-webkit-scrollbar { width: 4px; }
-    .log-body::-webkit-scrollbar-track { background: transparent; }
-    .log-body::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
-    .log-entry {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      padding: 10px 12px;
-      border-radius: 10px;
-      margin-bottom: 6px;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      transition: border-color 0.2s;
-      animation: slideIn 0.4s ease both;
-    }
-    @keyframes slideIn {
-      from { opacity: 0; transform: translateX(-10px); }
-      to   { opacity: 1; transform: translateX(0); }
-    }
-    .log-entry:hover { border-color: rgba(0,245,160,0.2); }
-    .log-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
-    .log-dot.success { background: var(--accent); box-shadow: 0 0 8px var(--accent); }
-    .log-dot.error   { background: var(--warn);   box-shadow: 0 0 8px var(--warn); }
-    .log-dot.info    { background: var(--accent2); box-shadow: 0 0 8px var(--accent2); }
-    .log-msg { font-size: 13px; color: var(--text); flex: 1; }
-    .log-time { font-size: 11px; color: var(--muted); font-family: 'Orbitron', monospace; white-space: nowrap; }
-    .side-col { display: flex; flex-direction: column; gap: 16px; }
-    .mini-card {
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-radius: 16px;
-      padding: 20px;
-    }
-    .mini-card h3 {
-      font-family: 'Orbitron', monospace;
-      font-size: 10px;
-      letter-spacing: 0.2em;
-      text-transform: uppercase;
-      color: var(--muted);
-      margin-bottom: 14px;
-    }
-    .progress-wrap { margin-bottom: 14px; }
-    .progress-meta { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 6px; }
-    .progress-meta span:first-child { color: var(--text); font-weight: 600; }
-    .progress-meta span:last-child  { color: var(--muted); }
-    .progress-bar { height: 6px; background: var(--border); border-radius: 10px; overflow: hidden; }
-    .progress-fill {
-      height: 100%;
-      border-radius: 10px;
-      background: linear-gradient(90deg, var(--accent), var(--accent2));
-      transition: width 1s ease;
-      position: relative;
-    }
-    .progress-fill::after {
-      content: '';
-      position: absolute;
-      top: 0; right: 0;
-      width: 4px; height: 100%;
-      background: white;
-      border-radius: 2px;
-      opacity: 0.6;
-    }
-    .schedule-list { display: flex; flex-direction: column; gap: 8px; }
-    .schedule-item {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      padding: 10px 12px;
-      background: var(--surface);
-      border-radius: 10px;
-      border: 1px solid var(--border);
-      font-size: 13px;
-    }
-    .schedule-time { font-family: 'Orbitron', monospace; font-size: 11px; color: var(--accent2); width: 70px; }
-    .schedule-label { flex: 1; color: var(--text); }
-    .schedule-status { font-size: 10px; padding: 2px 8px; border-radius: 10px; }
-    .schedule-status.done    { background: rgba(0,245,160,0.1); color: var(--accent);  border: 1px solid rgba(0,245,160,0.2); }
-    .schedule-status.next    { background: rgba(0,212,255,0.1); color: var(--accent2); border: 1px solid rgba(0,212,255,0.2); }
-    .schedule-status.pending { background: rgba(255,255,255,0.05); color: var(--muted); border: 1px solid var(--border); }
-    .controls { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 4px; }
-    .btn {
-      padding: 12px;
-      border-radius: 12px;
-      border: 1px solid;
-      font-family: 'Orbitron', monospace;
-      font-size: 10px;
-      letter-spacing: 0.1em;
-      cursor: pointer;
-      transition: all 0.2s;
-      text-align: center;
-      text-transform: uppercase;
-    }
-    .btn-primary {
-      background: linear-gradient(135deg, rgba(0,245,160,0.15), rgba(0,212,255,0.15));
-      border-color: rgba(0,245,160,0.4);
-      color: var(--accent);
-    }
-    .btn-primary:hover {
-      background: linear-gradient(135deg, rgba(0,245,160,0.25), rgba(0,212,255,0.25));
-      box-shadow: var(--glow);
-    }
-    .btn-ghost { background: transparent; border-color: var(--border); color: var(--muted); }
-    .btn-ghost:hover { border-color: rgba(255,255,255,0.2); color: var(--text); }
-    footer {
-      text-align: center;
-      padding-top: 20px;
-      border-top: 1px solid var(--border);
-      font-size: 11px;
-      color: var(--muted);
-      letter-spacing: 0.1em;
-    }
-    footer span { color: var(--accent); }
-    @media (max-width: 860px) {
-      .stats-grid { grid-template-columns: repeat(2, 1fr); }
-      .main-cols  { grid-template-columns: 1fr; }
-    }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CalmStrokes — Command Center</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#080810;--card:#0f0f1a;--border:#1a1a2e;--accent:#00ff88;--accent2:#ff3366;--accent3:#ffcc00;--text:#e0e0f0;--muted:#404060;}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;min-height:100vh;overflow-x:hidden;}
+body::after{content:'';position:fixed;inset:0;background:radial-gradient(ellipse at 20% 20%,rgba(0,255,136,0.04) 0%,transparent 60%),radial-gradient(ellipse at 80% 80%,rgba(255,51,102,0.04) 0%,transparent 60%);pointer-events:none;z-index:0;}
+.container{max-width:1400px;margin:0 auto;padding:32px 24px;position:relative;z-index:1;}
+header{display:flex;align-items:center;justify-content:space-between;margin-bottom:48px;border-bottom:1px solid var(--border);padding-bottom:24px;}
+.brand{display:flex;align-items:center;gap:16px;}
+.brand-icon{width:52px;height:52px;background:var(--accent);border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:24px;color:#000;}
+.brand h1{font-family:'Bebas Neue',sans-serif;font-size:32px;letter-spacing:3px;color:var(--text);}
+.brand p{font-size:10px;color:var(--muted);letter-spacing:3px;text-transform:uppercase;}
+.live-badge{display:flex;align-items:center;gap:8px;background:rgba(0,255,136,0.1);border:1px solid rgba(0,255,136,0.3);border-radius:100px;padding:8px 16px;font-size:11px;color:var(--accent);letter-spacing:1px;}
+.live-dot{width:6px;height:6px;background:var(--accent);border-radius:50%;animation:blink 1.5s infinite;}
+@keyframes blink{0%,100%{opacity:1;}50%{opacity:0.2;}}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:36px;}
+.stat{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:20px 24px;position:relative;overflow:hidden;transition:border-color 0.2s;}
+.stat:hover{border-color:var(--accent);}
+.stat::before{content:'';position:absolute;bottom:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--accent),transparent);}
+.stat-label{font-size:9px;text-transform:uppercase;letter-spacing:3px;color:var(--muted);margin-bottom:10px;}
+.stat-value{font-family:'Bebas Neue',sans-serif;font-size:42px;line-height:1;color:var(--text);}
+.stat-value.green{color:var(--accent);}
+.stat-value.red{color:var(--accent2);}
+.stat-value.yellow{color:var(--accent3);}
+.controls{background:var(--card);border:1px solid var(--border);border-radius:20px;padding:20px 24px;margin-bottom:32px;display:flex;align-items:center;gap:20px;flex-wrap:wrap;}
+.ctrl-label{font-size:10px;text-transform:uppercase;letter-spacing:2px;color:var(--muted);}
+.ppd{display:flex;align-items:center;gap:12px;}
+.ppd-btn{width:32px;height:32px;background:var(--border);border:none;color:var(--text);border-radius:8px;font-size:16px;cursor:pointer;transition:background 0.15s;display:flex;align-items:center;justify-content:center;}
+.ppd-btn:hover{background:var(--accent);color:#000;}
+.ppd-num{font-family:'Bebas Neue',sans-serif;font-size:32px;color:var(--accent);min-width:36px;text-align:center;}
+.ppd-sub{font-size:9px;color:var(--muted);}
+.apply-btn{margin-left:auto;background:var(--accent);color:#000;border:none;border-radius:10px;padding:10px 24px;font-family:'Bebas Neue',sans-serif;font-size:16px;letter-spacing:2px;cursor:pointer;transition:all 0.2s;}
+.apply-btn:hover{transform:translateY(-2px);box-shadow:0 6px 20px rgba(0,255,136,0.3);}
+.cal-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;}
+.cal-title{font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:3px;}
+.cal-nav{display:flex;gap:8px;}
+.nav-btn{width:32px;height:32px;background:var(--card);border:1px solid var(--border);color:var(--text);border-radius:8px;cursor:pointer;font-size:14px;transition:all 0.15s;display:flex;align-items:center;justify-content:center;}
+.nav-btn:hover{border-color:var(--accent);color:var(--accent);}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:8px;}
+.day-hdr{text-align:center;font-size:9px;text-transform:uppercase;letter-spacing:2px;color:var(--muted);padding:6px 0;}
+.day{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:8px;min-height:100px;transition:border-color 0.2s;position:relative;overflow:hidden;}
+.day:hover{border-color:rgba(0,255,136,0.3);}
+.day.today{border-color:var(--accent);}
+.day.today::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:var(--accent);}
+.day.empty{background:transparent;border-color:transparent;}
+.day.past{opacity:0.3;}
+.day-num{font-family:'Bebas Neue',sans-serif;font-size:16px;color:var(--muted);margin-bottom:6px;}
+.day.today .day-num{color:var(--accent);}
+.post-badge{display:inline-block;background:rgba(0,255,136,0.15);color:var(--accent);border-radius:4px;font-size:8px;padding:2px 6px;margin-bottom:4px;letter-spacing:1px;}
+.post-badge.posted{background:rgba(255,51,102,0.15);color:var(--accent2);}
+.thumb-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:3px;}
+.thumb{aspect-ratio:1;background:var(--border);border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:12px;}
+.post-time{font-size:8px;color:var(--muted);margin-top:3px;}
+.loading{grid-column:1/-1;text-align:center;padding:48px;color:var(--muted);}
+.spinner{width:28px;height:28px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin 0.8s linear infinite;margin:0 auto 12px;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.toast{position:fixed;bottom:24px;right:24px;background:var(--card);border:1px solid var(--accent);border-radius:12px;padding:14px 20px;font-size:12px;transform:translateY(80px);opacity:0;transition:all 0.3s cubic-bezier(0.34,1.56,0.64,1);z-index:999;}
+.toast.show{transform:translateY(0);opacity:1;}
+.drive-status{display:flex;align-items:center;gap:8px;font-size:10px;color:var(--muted);}
+.drive-dot{width:6px;height:6px;border-radius:50%;background:var(--accent3);}
+</style>
 </head>
 <body>
-<div class="page">
+<div class="container">
   <header>
-    <div class="logo-icon">🎮</div>
-    <div class="logo-text">
-      <h1>CalmStrokes</h1>
-      <p>Post Scheduler · Dashboard</p>
-    </div>
-    <div class="header-right">
-      <div class="status-badge">
-        <span class="dot"></span>
-        Scheduler Active
+    <div class="brand">
+      <div class="brand-icon">🎮</div>
+      <div>
+        <h1>CALMSTROKES</h1>
+        <p>Auto Post Command Center</p>
       </div>
-      <div id="live-time">--:--:--</div>
+    </div>
+    <div style="display:flex;gap:12px;align-items:center;">
+      <div class="drive-status"><div class="drive-dot"></div>Google Drive Connected</div>
+      <div class="live-badge"><div class="live-dot"></div>RAILWAY LIVE</div>
     </div>
   </header>
-  <div class="stats-grid">
-    <div class="stat-card">
-      <div class="stat-icon">📸</div>
-      <div class="stat-label">Images in Queue</div>
-      <div class="stat-value" id="stat-queue">{{ images_in_queue }}</div>
-      <div class="stat-sub">ready to post</div>
+
+  <div class="stats">
+    <div class="stat"><div class="stat-label">In Google Drive</div><div class="stat-value green" id="sDrive">—</div></div>
+    <div class="stat"><div class="stat-label">Total Posted</div><div class="stat-value red" id="sPosted">—</div></div>
+    <div class="stat"><div class="stat-label">Days of Content</div><div class="stat-value yellow" id="sDays">—</div></div>
+    <div class="stat"><div class="stat-label">Posts Per Day</div><div class="stat-value" id="sPPD">—</div></div>
+  </div>
+
+  <div class="controls">
+    <div class="ctrl-label">Posts per day</div>
+    <div class="ppd">
+      <button class="ppd-btn" onclick="adj(-1)">−</button>
+      <div><div class="ppd-num" id="ppd">5</div><div class="ppd-sub">per day</div></div>
+      <button class="ppd-btn" onclick="adj(1)">+</button>
     </div>
-    <div class="stat-card">
-      <div class="stat-icon">✅</div>
-      <div class="stat-label">Total Posted</div>
-      <div class="stat-value" id="stat-posted">{{ total_posted }}</div>
-      <div class="stat-sub">all time</div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-icon">📅</div>
-      <div class="stat-label">Days of Content</div>
-      <div class="stat-value" id="stat-days">{{ days_of_content }}</div>
-      <div class="stat-sub">remaining</div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-icon">⚡</div>
-      <div class="stat-label">Posts Per Day</div>
-      <div class="stat-value" id="stat-ppd">{{ posts_per_day }}</div>
-      <div class="stat-sub">scheduled</div>
+    <button class="apply-btn" onclick="apply()">⚡ APPLY</button>
+  </div>
+
+  <div class="cal-header">
+    <div class="cal-title" id="calTitle">MARCH 2026</div>
+    <div class="cal-nav">
+      <button class="nav-btn" onclick="prevMo()">←</button>
+      <button class="nav-btn" onclick="nextMo()">→</button>
     </div>
   </div>
-  <div class="main-cols">
-    <div class="section-card">
-      <div class="section-header">
-        <span>📋</span>
-        <h2>Recent Activity</h2>
-        <div class="tag" id="log-count">0 events</div>
-      </div>
-      <div class="log-body" id="log-list">
-        <div class="log-entry">
-          <div class="log-dot info"></div>
-          <div class="log-msg">Waiting for activity...</div>
-          <div class="log-time">--:--</div>
-        </div>
-      </div>
-    </div>
-    <div class="side-col">
-      <div class="mini-card">
-        <h3>Queue Progress</h3>
-        <div class="progress-wrap">
-          <div class="progress-meta">
-            <span>Images Used</span>
-            <span id="prog-label">0 / 198</span>
-          </div>
-          <div class="progress-bar">
-            <div class="progress-fill" id="prog-fill" style="width: 0%"></div>
-          </div>
-        </div>
-        <div class="progress-wrap">
-          <div class="progress-meta">
-            <span>Today's Posts</span>
-            <span id="today-label">0 / 5</span>
-          </div>
-          <div class="progress-bar">
-            <div class="progress-fill" id="today-fill" style="width: 0%"></div>
-          </div>
-        </div>
-      </div>
-      <div class="mini-card">
-        <h3>Today's Schedule</h3>
-        <div class="schedule-list">
-          <div class="schedule-item">
-            <div class="schedule-time">09:00</div>
-            <div class="schedule-label">Morning Post</div>
-            <div class="schedule-status done">Done</div>
-          </div>
-          <div class="schedule-item">
-            <div class="schedule-time">12:00</div>
-            <div class="schedule-label">Midday Post</div>
-            <div class="schedule-status done">Done</div>
-          </div>
-          <div class="schedule-item">
-            <div class="schedule-time">15:00</div>
-            <div class="schedule-label">Afternoon Post</div>
-            <div class="schedule-status next">Next</div>
-          </div>
-          <div class="schedule-item">
-            <div class="schedule-time">18:00</div>
-            <div class="schedule-label">Evening Post</div>
-            <div class="schedule-status pending">Pending</div>
-          </div>
-          <div class="schedule-item">
-            <div class="schedule-time">21:00</div>
-            <div class="schedule-label">Night Post</div>
-            <div class="schedule-status pending">Pending</div>
-          </div>
-        </div>
-      </div>
-      <div class="mini-card">
-        <h3>Controls</h3>
-        <div class="controls">
-          <button class="btn btn-primary" onclick="postNow()">Post Now</button>
-          <button class="btn btn-ghost" onclick="refreshStats()">Refresh</button>
-          <button class="btn btn-ghost" onclick="window.location.reload()">Reload</button>
-          <button class="btn btn-ghost" onclick="clearLog()">Clear Log</button>
-        </div>
-      </div>
-    </div>
+
+  <div class="cal-grid" id="calGrid">
+    <div class="loading"><div class="spinner"></div>Loading schedule...</div>
   </div>
-  <footer>
-    CalmStrokes Auto-Poster · Running on <span>Railway</span> · Facebook Gaming Memes 🎮
-  </footer>
 </div>
+<div class="toast" id="toast"></div>
+
 <script>
-  function updateClock() {
-    const now = new Date();
-    document.getElementById('live-time').textContent =
-      now.toLocaleTimeString('en-US', { hour12: false });
-  }
-  setInterval(updateClock, 1000);
-  updateClock();
+let ppd=5,yr=new Date().getFullYear(),mo=new Date().getMonth(),queue=[],postedCount=0,driveCount=0;
+const MONTHS=['JANUARY','FEBRUARY','MARCH','APRIL','MAY','JUNE','JULY','AUGUST','SEPTEMBER','OCTOBER','NOVEMBER','DECEMBER'];
+const EMOJIS=['🎮','🕹️','👾','🎯','🏆','⚡','🔥','💥','🌟','🎲','🎪','🎨'];
 
-  const logs = [];
-  function addLog(msg, type = 'info') {
-    const now = new Date();
-    const time = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
-    logs.unshift({ msg, type, time });
-    if (logs.length > 50) logs.pop();
-    renderLog();
-  }
-  function renderLog() {
-    const el = document.getElementById('log-list');
-    document.getElementById('log-count').textContent = `${logs.length} event${logs.length !== 1 ? 's' : ''}`;
-    if (logs.length === 0) {
-      el.innerHTML = `<div class="log-entry"><div class="log-dot info"></div><div class="log-msg">No activity yet.</div><div class="log-time">--:--</div></div>`;
-      return;
-    }
-    el.innerHTML = logs.map(l => `
-      <div class="log-entry">
-        <div class="log-dot ${l.type}"></div>
-        <div class="log-msg">${l.msg}</div>
-        <div class="log-time">${l.time}</div>
-      </div>`).join('');
-  }
-  function clearLog() { logs.length = 0; renderLog(); }
+async function load(){
+  try{
+    const[qr,sr]=await Promise.all([fetch('/api/queue'),fetch('/api/stats')]);
+    queue=await qr.json();
+    const s=await sr.json();
+    driveCount=s.total_images;
+    postedCount=s.total_posted;
+    ppd=s.posts_per_day;
+    document.getElementById('sDrive').textContent=s.total_images;
+    document.getElementById('sPosted').textContent=s.total_posted;
+    document.getElementById('sDays').textContent=s.days_of_content;
+    document.getElementById('sPPD').textContent=s.posts_per_day;
+    document.getElementById('ppd').textContent=ppd;
+    render();
+  }catch(e){console.error(e);}
+}
 
-  async function refreshStats() {
-    try {
-      const r = await fetch('/api/stats');
-      if (!r.ok) return;
-      const d = await r.json();
-      if (d.images_in_queue !== undefined) document.getElementById('stat-queue').textContent = d.images_in_queue;
-      if (d.total_posted   !== undefined) document.getElementById('stat-posted').textContent = d.total_posted;
-      if (d.days_of_content!== undefined) document.getElementById('stat-days').textContent  = d.days_of_content;
-      if (d.posts_per_day  !== undefined) document.getElementById('stat-ppd').textContent   = d.posts_per_day;
-      const total = (d.images_in_queue || 0) + (d.total_posted || 0);
-      if (total > 0) {
-        const pct = Math.round((d.total_posted / total) * 100);
-        document.getElementById('prog-fill').style.width  = pct + '%';
-        document.getElementById('prog-label').textContent = `${d.total_posted} / ${total}`;
+function adj(d){ppd=Math.max(1,Math.min(10,ppd+d));document.getElementById('ppd').textContent=ppd;}
+
+async function apply(){
+  const b=document.querySelector('.apply-btn');
+  b.textContent='...';b.disabled=true;
+  try{
+    const r=await fetch('/api/rebuild-queue',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({posts_per_day:ppd})});
+    const d=await r.json();
+    toast(`✅ ${d.total} posts scheduled!`);
+    await load();
+  }catch(e){toast('❌ Error');}
+  b.textContent='⚡ APPLY';b.disabled=false;
+}
+
+function render(){
+  const g=document.getElementById('calGrid');
+  document.getElementById('calTitle').textContent=`${MONTHS[mo]} ${yr}`;
+  const byDate={};
+  queue.forEach(q=>{if(!byDate[q.date])byDate[q.date]=[];byDate[q.date].push(q);});
+  const first=new Date(yr,mo,1).getDay();
+  const days=new Date(yr,mo+1,0).getDate();
+  const today=new Date().toISOString().split('T')[0];
+  let h=`<div class="day-hdr">SUN</div><div class="day-hdr">MON</div><div class="day-hdr">TUE</div><div class="day-hdr">WED</div><div class="day-hdr">THU</div><div class="day-hdr">FRI</div><div class="day-hdr">SAT</div>`;
+  for(let i=0;i<first;i++)h+=`<div class="day empty"></div>`;
+  for(let d=1;d<=days;d++){
+    const ds=`${yr}-${String(mo+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const isT=ds===today,isPast=ds<today;
+    const posts=byDate[ds]||[];
+    let cls='day'+(isT?' today':'')+(isPast&&!isT?' past':'');
+    let inner='';
+    if(posts.length){
+      const allPosted=posts.every(p=>p.status==='posted');
+      inner+=`<div class="post-badge${allPosted?' posted':''}">${posts.length} POST${posts.length>1?'S':''}</div>`;
+      if(posts.length===1){
+        inner+=`<div class="thumb">${EMOJIS[d%EMOJIS.length]}</div><div class="post-time">${posts[0].time}</div>`;
+      }else{
+        inner+=`<div class="thumb-grid">`;
+        posts.slice(0,4).forEach((_,i)=>inner+=`<div class="thumb">${EMOJIS[(d+i)%EMOJIS.length]}</div>`);
+        inner+=`</div>`;
+        if(posts.length>4)inner+=`<div class="post-time">+${posts.length-4} more</div>`;
       }
-      const ppd = d.posts_per_day || 5;
-      const td  = d.today_posted || 0;
-      document.getElementById('today-fill').style.width  = Math.min(100, Math.round((td / ppd) * 100)) + '%';
-      document.getElementById('today-label').textContent = `${td} / ${ppd}`;
-      addLog('Stats refreshed', 'info');
-    } catch(e) {
-      addLog('Could not reach backend', 'error');
     }
+    h+=`<div class="${cls}"><div class="day-num">${d}</div>${inner}</div>`;
   }
+  g.innerHTML=h;
+}
 
-  async function postNow() {
-    addLog('Manual post triggered…', 'info');
-    try {
-      const r = await fetch('/post_now', { method: 'POST' });
-      const d = await r.json();
-      if (d.success) {
-        addLog('✅ Posted successfully!', 'success');
-        refreshStats();
-      } else {
-        addLog('❌ Post failed: ' + (d.error || 'unknown'), 'error');
-      }
-    } catch(e) {
-      addLog('❌ Could not reach backend', 'error');
-    }
-  }
-
-  refreshStats();
-  setInterval(refreshStats, 60000);
+function prevMo(){mo--;if(mo<0){mo=11;yr--;}render();}
+function nextMo(){mo++;if(mo>11){mo=0;yr++;}render();}
+function toast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),3000);}
+load();setInterval(load,30000);
 </script>
 </body>
 </html>
