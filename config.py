@@ -6,6 +6,6 @@ IMAGES_FOLDER = "images"
 POSTED_FOLDER = "posted"
 QUEUE_FILE = "queue.json"
 POSTED_FILE = "posted.json"
-DEFAULT_CAPTION = "CalmStrokes Gaming Vibes"
+DEFAULT_CAPTION = ""
 USE_AI_CAPTIONS = False
 ANTHROPIC_API_KEY = "YOUR_ANTHROPIC_API_KEY_HERE"
