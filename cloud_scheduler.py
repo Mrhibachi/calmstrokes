@@ -88,3 +88,8 @@ def run_post():
         return
 
     print("⚠️ No new images to post")
+
+
+if __name__ == "__main__":
+    print("🚀 Scheduler started...")
+    run_post()
