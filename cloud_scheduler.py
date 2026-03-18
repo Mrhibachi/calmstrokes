@@ -1,6 +1,8 @@
 import json
 import os
 import poster
+import schedule
+import time
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 HISTORY_FILE = os.path.join(BASE_DIR, "posted_history.json")
@@ -90,6 +92,19 @@ def run_post():
     print("⚠️ No new images to post")
 
 
-if __name__ == "__main__":
-    print("🚀 Scheduler started...")
+def job():
+    print("🎯 Scheduled post triggered")
     run_post()
+
+print("🚀 Scheduler started...")
+
+# California times converted to UTC (Railway runs in UTC)
+schedule.every().day.at("16:00").do(job)  # 9 AM CA
+schedule.every().day.at("19:00").do(job)  # 12 PM CA
+schedule.every().day.at("22:00").do(job)  # 3 PM CA
+schedule.every().day.at("01:00").do(job)  # 6 PM CA
+schedule.every().day.at("04:00").do(job)  # 9 PM CA
+
+while True:
+    schedule.run_pending()
+    time.sleep(30)
