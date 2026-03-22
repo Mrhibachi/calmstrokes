@@ -10,7 +10,14 @@ from googleapiclient.http import MediaIoBaseDownload
 import io
 SCOPES = ['https://www.googleapis.com/auth/drive']
 
-creds = Credentials.from_service_account_file('service_account.json', scopes=SCOPES)
+import os
+import json
+
+creds_json = os.environ.get("GOOGLE_CREDS")
+
+creds_dict = json.loads(creds_json)
+
+creds = Credentials.from_service_account_info(creds_dict, scopes=SCOPES)
 drive_service = build('drive', 'v3', credentials=creds)
 
 FB_FOLDER_ID = "1_1AZn3XjrrqrM_dNfS5yKmb0DqHHWxu9"
