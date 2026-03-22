@@ -4,7 +4,17 @@ import os
 import shutil
 from datetime import datetime
 from config import *
+from googleapiclient.discovery import build
+from google.oauth2.service_account import Credentials
+from googleapiclient.http import MediaIoBaseDownload
+import io
+SCOPES = ['https://www.googleapis.com/auth/drive']
 
+creds = Credentials.from_service_account_file('service_account.json', scopes=SCOPES)
+drive_service = build('drive', 'v3', credentials=creds)
+
+FB_FOLDER_ID = "1_1AZn3XjrrqrM_dNfS5yKmb0DqHHWxu9"
+POSTED_FOLDER_ID = "1U7Fp77ZKy3Y_Kgs9DJjUx0sLeIPpO38U"
 def post_image_to_facebook(image_path, caption=None):
     if caption is None:
         caption = DEFAULT_CAPTION
@@ -107,3 +117,53 @@ if __name__ == "__main__":
         post_image_to_facebook(image_path)
     else:
         print("❌ No images found")
+def get_drive_images():
+    results = drive_service.files().list(
+        q=f"'{FB_FOLDER_ID}' in parents and mimeType contains 'image/'",
+        fields="files(id, name)"
+    ).execute()
+
+    return results.get('files', [])
+def download_image(file_id, filename):
+    request = drive_service.files().get_media(fileId=file_id)
+    fh = open(f"images/{filename}", 'wb')
+
+    downloader = MediaIoBaseDownload(fh, request)
+
+    done = False
+    while not done:
+        status, done = downloader.next_chunk()
+
+    fh.close()
+def move_drive_file(file_id):
+    file = drive_service.files().get(fileId=file_id, fields='parents').execute()
+    previous_parents = ",".join(file.get('parents'))
+
+    drive_service.files().update(
+        fileId=file_id,
+        addParents=POSTED_FOLDER_ID,
+        removeParents=previous_parents
+    ).execute()
+def run_drive_post():
+    images = get_drive_images()
+
+    if not images:
+        print("❌ No images in Drive")
+        return
+
+    image = images[0]
+    file_id = image['id']
+    filename = image['name']
+
+    print(f"📥 Downloading {filename}")
+    download_image(file_id, filename)
+
+    image_path = f"images/{filename}"
+
+    result = post_image_to_facebook(image_path)
+
+    if result:
+        move_drive_file(file_id)
+        os.remove(image_path)
+        print(f"📦 Moved in Drive + cleaned local: {filename}")
+

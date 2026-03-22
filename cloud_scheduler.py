@@ -99,11 +99,13 @@ def job():
 print("🚀 Scheduler started...")
 
 # California times converted to UTC (Railway runs in UTC)
-schedule.every().day.at("16:00").do(job)  # 9 AM CA
-schedule.every().day.at("19:00").do(job)  # 12 PM CA
-schedule.every().day.at("22:00").do(job)  # 3 PM CA
-schedule.every().day.at("01:00").do(job)  # 6 PM CA
-schedule.every().day.at("04:00").do(job)  # 9 PM CA
+schedule.every().day.at("14:30").do(poster.run_drive_post)
+schedule.every().day.at("17:30").do(poster.run_drive_post)
+schedule.every().day.at("19:30").do(poster.run_drive_post)
+schedule.every().day.at("22:30").do(poster.run_drive_post)
+schedule.every().day.at("01:30").do(poster.run_drive_post)
+schedule.every().day.at("04:30").do(poster.run_drive_post)
+schedule.every().day.at("06:45").do(poster.run_drive_post)
 
 while True:
     schedule.run_pending()
