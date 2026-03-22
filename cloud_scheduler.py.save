@@ -1,0 +1,112 @@
+import json
+import os
+import poster
+import schedule
+import time
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+HISTORY_FILE = os.path.join(BASE_DIR, "posted_history.json")
+IMAGES_DIR = os.path.join(BASE_DIR, "images")
+SUPPORTED_EXTENSIONS = (".jpg", ".jpeg", ".png", ".gif", ".webp")
+
+
+def load_history():
+    if not os.path.exists(HISTORY_FILE):
+        return []
+
+    try:
+        with open(HISTORY_FILE, "r") as f:
+            data = json.load(f)
+        if isinstance(data, list):
+            return [str(item) for item in data]
+        return []
+    except (json.JSONDecodeError, OSError):
+        return []
+
+
+def save_history(history):
+    cleaned_history = []
+    seen = set()
+
+    for item in history:
+        item = str(item)
+        if item not in seen:
+            seen.add(item)
+            cleaned_history.append(item)
+
+    with open(HISTORY_FILE, "w") as f:
+        json.dump(cleaned_history, f, indent=2)
+
+
+def get_available_images():
+    if not os.path.exists(IMAGES_DIR):
+        return []
+
+    files = []
+    for name in os.listdir(IMAGES_DIR):
+        if name.lower().endswith(SUPPORTED_EXTENSIONS):
+            files.append(name)
+
+    return sorted(files)
+
+
+def run_post():
+    print("🎮 Checking for images...")
+
+    history = load_history()
+    history_set = set(history)
+
+    if not os.path.exists(IMAGES_DIR):
+        print("❌ No images folder found")
+        return
+
+    files = get_available_images()
+
+    if not files:
+        print("❌ No images available")
+        return
+
+    for file in files:
+        if file in history_set:
+            print(f"⏭️ Skipping duplicate: {file}")
+            continue
+
+        image_path = os.path.join(IMAGES_DIR, file)
+        print(f"📥 Posting: {file}")
+
+        try:
+            result = poster.post_image_to_facebook(image_path)
+            if result is False:
+                print(f"❌ Post failed for {file}")
+                return
+        except Exception as e:
+            print(f"❌ Error posting {file}: {e}")
+            return
+
+        history.append(file)
+        save_history(history)
+
+        print(f"✅ Saved to history: {file}")
+        return
+
+    print("⚠️ No new images to post")
+
+
+def job():
+    print("🎯 Scheduled post triggered")
+    run_post()
+
+print("🚀 Scheduler started...")
+
+# California times converted to UTC (Railway runs in UTC)
+schedule.every().day.at("14:30").do(job)  # 7:30 AM CA
+schedule.every().day.at("17:30").do(job)  # 10:30 AM CA
+schedule.every().day.at("19:30").do(job)  # 12:30 PM CA
+schedule.every().day.at("22:30").do(job)  # 3:30 PM CA
+schedule.every().day.at("01:30").do(job)  # 6:30 PM CA
+schedule.every().day.at("04:30").do(job)  # 9:30 PM CA
+schedule.every().day.at("06:45").do(job)  # 11:45 PM CAx
+
+while True:
+    schedule.run_pending()
+    time.sleep(30)
