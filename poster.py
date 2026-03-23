@@ -170,7 +170,10 @@ def run_drive_post():
     result = post_image_to_facebook(image_path)
 
     if result:
-        move_drive_file(file_id)
+    move_drive_file(file_id)
+
+    if os.path.exists(image_path):
         os.remove(image_path)
-        print(f"📦 Moved in Drive + cleaned local: {filename}")
+
+    print(f"📦 Moved in Drive + cleaned local: {filename}")
 
