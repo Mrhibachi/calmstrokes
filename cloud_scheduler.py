@@ -108,5 +108,9 @@ schedule.every().day.at("04:30").do(poster.run_drive_post)
 schedule.every().day.at("06:45").do(poster.run_drive_post)
 
 while True:
-    schedule.run_pending()
+    try:
+        schedule.run_pending()
+    except Exception as e:
+        print(f"❌ Scheduler error: {e}")
+
     time.sleep(30)
